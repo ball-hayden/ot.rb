@@ -52,8 +52,6 @@ describe OT::TextOperation do
       str = h.random_string(50)
       o = h.random_operation(str)
 
-      byebug if o.target_length != o.apply(str).length
-
       expect(o.base_length).to eq str.length
       expect(o.target_length).to eq o.apply(str).length
     end
@@ -148,12 +146,12 @@ describe OT::TextOperation do
     expect(o.to_s).to eq "retain 2, insert 'lorem', delete 5, retain 5"
   end
 
-  it 'should correctly serialize and deserialize the transformation from JSON' do
+  it 'should correctly serialize and deserialize the transformation from an array' do
     n.times do
       doc = h.random_string(50)
       operation = h.random_operation(doc)
 
-      expect(operation).to eq OT::TextOperation.from_json(operation.to_json)
+      expect(operation).to eq OT::TextOperation.from_a(operation.to_a)
     end
   end
 
@@ -181,28 +179,28 @@ describe OT::TextOperation do
     a = OT::TextOperation.new.retain(3)
     b = OT::TextOperation.new.retain(1).insert('tag').retain(2)
 
-    expect(a).to be_composed_with b
-    expect(b).to be_composed_with a
+    expect(a.compose_with?(b)).to be true
+    expect(b.compose_with?(a)).to be true
 
     a = OT::TextOperation.new.retain(1).insert('a').retain(2)
     b = OT::TextOperation.new.retain(2).insert('b').retain(2)
-    expect(a).to be_composed_with b
+    expect(a.compose_with?(b)).to be true
     a.delete(3)
-    expect(a).to_not be_composed_with b
+    expect(a.compose_with?(b)).to be false
 
     a = OT::TextOperation.new.retain(1).insert('b').retain(2)
     b = OT::TextOperation.new.retain(1).insert('a').retain(3)
-    expect(a).to_not be_composed_with b
+    expect(a.compose_with?(b)).to be false
 
     a = OT::TextOperation.new.retain(4).delete(3).retain(10)
     b = OT::TextOperation.new.retain(2).delete(2).retain(10)
-    expect(a).to be_composed_with b
+    expect(a.compose_with?(b)).to be true
 
     b = OT::TextOperation.new.retain(4).delete(7).retain(3)
-    expect(a).to be_composed_with b
+    expect(a.compose_with?(b)).to be true
 
     b = OT::TextOperation.new.retain(2).delete(9).retain(3)
-    expect(a).to_not be_composed_with b
+    expect(a.compose_with?(b)).to be false
   end
 
   it 'checks if two operations could be composed together if they were inverted' do
@@ -216,7 +214,7 @@ describe OT::TextOperation do
       b = h.random_operation(after_a)
       b_inv = b.invert(after_a)
 
-      expect(b_inv.shouldBeComposedWithInverted(a_inv)).to eq a.shouldBeComposedWith(b)
+      expect(b_inv.compose_with_inverted?(a_inv)).to eq a.compose_with?(b)
     end
   end
 

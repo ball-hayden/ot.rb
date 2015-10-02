@@ -134,56 +134,51 @@ module OT
       return self
     end
 
-    # # Tests whether this operation has no effect.
-    # TextOperation.prototype.isNoop = function () {
-    #   return @ops.length === 0 || (@ops.length === 1 && retain_op?(@ops[0]));
-    # };
-    #
-    # # Pretty printing.
-    # TextOperation.prototype.toString = function () {
-    #   # map: build a new array by applying a function to every element in an old
-    #   # array.
-    #   var map = Array.prototype.map || function (fn) {
-    #     var arr = this;
-    #     var newArr = [];
-    #     for (var i = 0, l = arr.length; i < l; i++) {
-    #       newArr[i] = fn(arr[i]);
-    #     }
-    #     return newArr;
-    #   };
-    #   return map.call(@ops, function (op) {
-    #     if (retain_op?(op)) {
-    #       return "retain " + op;
-    #     } else if (insert_op?(op)) {
-    #       return "insert '" + op + "'";
-    #     } else {
-    #       return "delete " + (-op);
-    #     }
-    #   }).join(', ');
-    # };
-    #
-    # # Converts operation into a JSON value.
-    # TextOperation.prototype.toJSON = function () {
-    #   return @ops;
-    # };
-    #
-    # # Converts a plain JS object into an operation and validates it.
-    # TextOperation.fromJSON = function (ops) {
-    #   var o = new TextOperation();
-    #   for (var i = 0, l = ops.length; i < l; i++) {
-    #     var op = ops[i];
-    #     if (retain_op?(op)) {
-    #       o.retain(op);
-    #     } else if (insert_op?(op)) {
-    #       o.insert(op);
-    #     } else if (delete_op?(op)) {
-    #       o['delete'](op);
-    #     } else {
-    #       throw new Error("unknown operation: " + JSON.stringify(op));
-    #     }
-    #   }
-    #   return o;
-    # };
+    # Tests whether this operation has no effect.
+    def noop?
+      return @ops.length == 0 || (@ops.length == 1 && retain_op?(@ops[0]))
+    end
+
+    # Pretty printing.
+    def to_s
+      # map: build a new array by applying a function to every element in an old
+      # array.
+      @ops.map do |op|
+        if retain_op?(op)
+          "retain #{op}"
+        elsif insert_op?(op)
+          "insert '#{op}'"
+        else
+          "delete #{-op}"
+        end
+      end.join(', ')
+    end
+
+    # Converts operation into an array value.
+    # Note that this replaces the toJSON method in ot.js
+    def to_a
+      return @ops
+    end
+
+    # Converts an array into an operation and validates it.
+    # Note that this replaces the fromJSON method in ot.js
+    def self.from_a(ops)
+      operation = TextOperation.new
+
+      ops.each do |op|
+        if retain_op?(op)
+          operation.retain(op)
+        elsif insert_op?(op)
+          operation.insert(op)
+        elsif delete_op?(op)
+          operation.delete(op)
+        else
+          fail 'unknown operation: ' + JSON.stringify(op)
+        end
+      end
+
+      return operation
+    end
 
     # Apply an operation to a string, returning a new string. Throws an error if
     # there's a mismatch between the input string and the operation.
@@ -220,29 +215,29 @@ module OT
       return new_str
     end
 
-    # # Computes the inverse of an operation. The inverse of an operation is the
-    # # operation that reverts the effects of the operation, e.g. when you have an
-    # # operation 'insert("hello "); skip(6);' then the inverse is 'delete("hello ");
-    # # skip(6);'. The inverse should be used for implementing undo.
-    # TextOperation.prototype.invert = function (str) {
-    #   var str_index = 0;
-    #   var inverse = new TextOperation();
-    #   var ops = @ops;
-    #   for (var i = 0, l = ops.length; i < l; i++) {
-    #     var op = ops[i];
-    #     if (retain_op?(op)) {
-    #       inverse.retain(op);
-    #       str_index += op;
-    #     } else if (insert_op?(op)) {
-    #       inverse['delete'](op.length);
-    #     } else { # delete op
-    #       inverse.insert(str.slice(str_index, str_index - op));
-    #       str_index -= op;
-    #     }
-    #   }
-    #   return inverse;
-    # };
-    #
+    # Computes the inverse of an operation. The inverse of an operation is the
+    # operation that reverts the effects of the operation, e.g. when you have an
+    # operation 'insert("hello "); skip(6);' then the inverse is 'delete("hello ");
+    # skip(6);'. The inverse should be used for implementing undo.
+    def invert(str)
+      str_index = 0
+      inverse = TextOperation.new
+
+      @ops.each do |op|
+        if retain_op?(op)
+          inverse.retain(op)
+          str_index += op
+        elsif insert_op?(op)
+          inverse.delete(op.length)
+        else # delete op
+          inverse.insert(str.slice(str_index, -op))
+          str_index -= op
+        end
+      end
+
+      return inverse
+    end
+
     # # Compose merges two consecutive operations into one operation, that
     # # preserves the changes of both. Or, in other words, for each input string S
     # # and a pair of consecutive operations A and B,
@@ -345,75 +340,84 @@ module OT
     #   }
     #   return operation;
     # };
-    #
-    # function getSimpleOp (operation, fn) {
-    #   var ops = operation.ops;
-    #   var retain_op? = TextOperation.retain_op?;
-    #   switch (ops.length) {
-    #   case 1:
-    #     return ops[0];
-    #   case 2:
-    #     return retain_op?(ops[0]) ? ops[1] : (retain_op?(ops[1]) ? ops[0] : null);
-    #   case 3:
-    #     if (retain_op?(ops[0]) && retain_op?(ops[2])) { return ops[1]; }
-    #   }
-    #   return null;
-    # }
-    #
-    # function getStartIndex (operation) {
-    #   if (retain_op?(operation.ops[0])) { return operation.ops[0]; }
-    #   return 0;
-    # }
-    #
-    # # When you use ctrl-z to undo your latest changes, you expect the program not
-    # # to undo every single keystroke but to undo your last sentence you wrote at
-    # # a stretch or the deletion you did by holding the backspace key down. This
-    # # This can be implemented by composing operations on the undo stack. This
-    # # method can help decide whether two operations should be composed. It
-    # # returns true if the operations are consecutive insert operations or both
-    # # operations delete text at the same position. You may want to include other
-    # # factors like the time since the last change in your decision.
-    # TextOperation.prototype.shouldBeComposedWith = function (other) {
-    #   if (this.isNoop() || other.isNoop()) { return true; }
-    #
-    #   var startA = getStartIndex(this), startB = getStartIndex(other);
-    #   var simpleA = getSimpleOp(this), simpleB = getSimpleOp(other);
-    #   if (!simpleA || !simpleB) { return false; }
-    #
-    #   if (insert_op?(simpleA) && insert_op?(simpleB)) {
-    #     return startA + simpleA.length === startB;
-    #   }
-    #
-    #   if (delete_op?(simpleA) && delete_op?(simpleB)) {
-    #     # there are two possibilities to delete: with backspace and with the
-    #     # delete key.
-    #     return (startB - simpleB === startA) || startA === startB;
-    #   }
-    #
-    #   return false;
-    # };
-    #
-    # # Decides whether two operations should be composed with each other
-    # # if they were inverted, that is
-    # # `shouldBeComposedWith(a, b) = shouldBeComposedWithInverted(b^{-1}, a^{-1})`.
-    # TextOperation.prototype.shouldBeComposedWithInverted = function (other) {
-    #   if (this.isNoop() || other.isNoop()) { return true; }
-    #
-    #   var startA = getStartIndex(this), startB = getStartIndex(other);
-    #   var simpleA = getSimpleOp(this), simpleB = getSimpleOp(other);
-    #   if (!simpleA || !simpleB) { return false; }
-    #
-    #   if (insert_op?(simpleA) && insert_op?(simpleB)) {
-    #     return startA + simpleA.length === startB || startA === startB;
-    #   }
-    #
-    #   if (delete_op?(simpleA) && delete_op?(simpleB)) {
-    #     return startB - simpleB === startA;
-    #   }
-    #
-    #   return false;
-    # };
-    #
+
+    def self.get_simple_op(operation)
+      ops = operation.ops
+
+      case (ops.length)
+      when 1
+        return ops[0]
+      when 2
+        return retain_op?(ops[0]) ? ops[1] : (retain_op?(ops[1]) ? ops[0] : nil)
+      when 3
+        return ops[1] if retain_op?(ops[0]) && retain_op?(ops[2])
+      end
+
+      return
+    end
+
+    def self.get_start_index(operation)
+      return operation.ops[0] if retain_op?(operation.ops[0])
+      return 0
+    end
+
+    # When you use ctrl-z to undo your latest changes, you expect the program not
+    # to undo every single keystroke but to undo your last sentence you wrote at
+    # a stretch or the deletion you did by holding the backspace key down. This
+    # This can be implemented by composing operations on the undo stack. This
+    # method can help decide whether two operations should be composed. It
+    # returns true if the operations are consecutive insert operations or both
+    # operations delete text at the same position. You may want to include other
+    # factors like the time since the last change in your decision.
+    def compose_with?(other)
+      return true if noop? || other.noop?
+
+      start_a = TextOperation.get_start_index(self)
+      start_b = TextOperation.get_start_index(other)
+
+      simple_a = TextOperation.get_simple_op(self)
+      simple_b = TextOperation.get_simple_op(other)
+
+      return false unless simple_a && simple_b
+
+      if insert_op?(simple_a) && insert_op?(simple_b)
+        return start_a + simple_a.length === start_b
+      end
+
+      if delete_op?(simple_a) && delete_op?(simple_b)
+        # there are two possibilities to delete: with backspace and with the
+        # delete key.
+        return (start_b - simple_b == start_a) || start_a == start_b
+      end
+
+      return false
+    end
+
+    # Decides whether two operations should be composed with each other
+    # if they were inverted, that is
+    # `shouldBeComposedWith(a, b) = shouldBeComposedWithInverted(b^{-1}, a^{-1})`.
+    def compose_with_inverted?(other)
+      return true if noop? || other.noop?
+
+      start_a = TextOperation.get_start_index(self)
+      start_b = TextOperation.get_start_index(other)
+
+      simple_a = TextOperation.get_simple_op(self)
+      simple_b = TextOperation.get_simple_op(other)
+
+      return false unless simple_a && simple_b
+
+      if insert_op?(simple_a) && insert_op?(simple_b)
+        return start_a + simple_a.length === start_b || start_a === start_b
+      end
+
+      if delete_op?(simple_a) && delete_op?(simple_b)
+        return start_b - simple_b === start_a
+      end
+
+      return false
+    end
+
     # # Transform takes two operations A and B that happened concurrently and
     # # produces two operations A' and B' (in an array) such that
     # # `apply(apply(S, A), B') = apply(apply(S, B), A')`. This function is the
