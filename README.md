@@ -1,5 +1,7 @@
 # ot.rb
 
+[![Build Status](https://travis-ci.org/ball-hayden/ot.rb.svg)](https://travis-ci.org/ball-hayden/ot.rb)
+
 This is a Ruby port of the <https://github.com/Operational-Transformation/ot.js>
 Operational Transformation library.
 
