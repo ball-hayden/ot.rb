@@ -10,28 +10,28 @@ describe OT::TextOperation do
   n = 500
 
   it 'should test lengths' do
-    expect(o.baseLength).to eq 0
-    expect(o.targetLength).to eq 0
+    expect(o.base_length).to eq 0
+    expect(o.target_length).to eq 0
 
     o.retain(5)
 
-    expect(o.baseLength).to eq 5
-    expect(o.targetLength).to eq 5
+    expect(o.base_length).to eq 5
+    expect(o.target_length).to eq 5
 
     o.insert('abc')
 
-    expect(o.baseLength).to eq 5
-    expect(o.targetLength).to eq 8
+    expect(o.base_length).to eq 5
+    expect(o.target_length).to eq 8
 
     o.retain(2)
 
-    expect(o.baseLength).to eq 7
-    expect(o.targetLength).to eq 10
+    expect(o.base_length).to eq 7
+    expect(o.target_length).to eq 10
 
     o.delete(2)
 
-    expect(o.baseLength).to eq 9
-    expect(o.targetLength).to eq 10
+    expect(o.base_length).to eq 9
+    expect(o.target_length).to eq 10
   end
 
   it 'should allow methods to be chained' do
@@ -52,8 +52,10 @@ describe OT::TextOperation do
       str = h.random_string(50)
       o = h.random_operation(str)
 
-      expect(o.baseLength).to eq str.length
-      expect(o.targetLength).to eq o.apply(str).length
+      byebug if o.target_length != o.apply(str).length
+
+      expect(o.base_length).to eq str.length
+      expect(o.target_length).to eq o.apply(str).length
     end
   end
 
@@ -63,8 +65,8 @@ describe OT::TextOperation do
       o = h.random_operation(str)
       p = o.invert(str)
 
-      expect(p.targetLength).to eq o.baseLength
-      expect(p.baseLength).to eq o.targetLength
+      expect(p.target_length).to eq o.base_length
+      expect(p.base_length).to eq o.target_length
 
       expect(str).to eq(p.apply(o.apply(str)))
     end
@@ -162,8 +164,8 @@ describe OT::TextOperation do
     # o = OT::TextOperation.from_json(ops)
 
     # expect(o.ops.length).to eq 3
-    # expect(o.baseLength).to eq 4
-    # expect(o.targetLength).to eq 5
+    # expect(o.base_length).to eq 4
+    # expect(o.target_length).to eq 5
 
     # function assertIncorrectAfter (fn) {
     #   ops2 = ops.slice(0)
@@ -224,15 +226,15 @@ describe OT::TextOperation do
       a = h.random_operation(str)
 
       after_a = a.apply(str)
-      expect(after_a.length).to eq a.targetLength
+      expect(after_a.length).to eq a.target_length
 
       b = h.random_operation(after_a)
       after_b = b.apply(after_a)
-      expect(after_b.length).to eq b.targetLength
+      expect(after_b.length).to eq b.target_length
 
       ab = a.compose(b)
       expect(a.meta).to eq ab.meta
-      expect(b.targetLength).to eq ab.targetLength
+      expect(b.target_length).to eq ab.target_length
 
       after_ab = ab.apply(str)
       expect(after_ab).to eq after_b
@@ -245,7 +247,7 @@ describe OT::TextOperation do
       a = h.random_operation(str)
       b = h.random_operation(str)
 
-      primes = TextOperation.transform(a, b)
+      primes = OT::TextOperation.transform(a, b)
       a_prime = primes[0]
       b_prime = primes[1]
 

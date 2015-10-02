@@ -19,21 +19,22 @@ class Helpers
   def random_operation(str)
     operation = OT::TextOperation.new
 
-    left = 0
+    loop do
+      left = str.length - operation.base_length
 
-    until left == 0
-      left = str.length - operation.baseLength
+      break if left == 0
 
       r = Random.rand
 
-      l = 1 + Random.rand([left - 1, 20].min)
+      length = 1
+      length += Random.rand([left - 1, 20].min) if left > 1
 
       if r < 0.2
-        operation.insert(random_string(l))
+        operation.insert(random_string(length))
       elsif r < 0.4
-        operation.delete(l)
+        operation.delete(length)
       else
-        operation.retain(l)
+        operation.retain(length)
       end
     end
 
