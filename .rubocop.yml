@@ -1,0 +1,11 @@
+LineLength:
+  Enabled: false
+
+RedundantReturn:
+  Enabled: false
+
+SingleLineBlockParams:
+  Enabled: false
+
+SingleSpaceBeforeFirstArg:
+  Enabled: false
