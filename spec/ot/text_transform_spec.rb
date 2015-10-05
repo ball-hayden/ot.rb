@@ -155,24 +155,22 @@ describe OT::TextOperation do
     end
   end
 
-  it 'should correctly handle errors in json' do
-    pending 'this test needs porting'
+  it 'should correctly handle errors in an input array' do
+    ops = [2, -1, -1, 'cde']
+    o = OT::TextOperation.from_a(ops)
 
-    # ops = [2, -1, -1, 'cde']
-    # o = OT::TextOperation.from_json(ops)
+    expect(o.ops.length).to eq 3
+    expect(o.base_length).to eq 4
+    expect(o.target_length).to eq 5
 
-    # expect(o.ops.length).to eq 3
-    # expect(o.base_length).to eq 4
-    # expect(o.target_length).to eq 5
+    ops2 = ops.dup
+    ops2.push(insert: 'x')
 
-    # function assertIncorrectAfter (fn) {
-    #   ops2 = ops.slice(0)
-    #   fn(ops2)
-    #   test.throws(function () { TextOperation.fromJSON(ops2) })
-    # }
+    expect { OT::TextOperation.from_a(ops2) }.to raise_exception 'unknown operation: {:insert=>"x"}'
 
-    # assertIncorrectAfter(function (ops2) { ops2.push(insert: 'x') })
-    # assertIncorrectAfter(function (ops2) { ops2.push(null) })
+    ops3 = ops.dup
+    ops3.push(nil)
+    expect { OT::TextOperation.from_a(ops3) }.to raise_exception 'unknown operation: '
   end
 
   it 'should detect sequential operations that can be composed together for "natural" undo' do

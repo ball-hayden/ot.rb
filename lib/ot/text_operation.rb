@@ -173,7 +173,7 @@ module OT
         elsif delete_op?(op)
           operation.delete(op)
         else
-          fail 'unknown operation: ' + JSON.stringify(op)
+          fail 'unknown operation: ' + op.to_s
         end
       end
 
