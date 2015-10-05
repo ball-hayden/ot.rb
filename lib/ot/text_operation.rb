@@ -433,122 +433,134 @@ module OT
       return false
     end
 
-    # # Transform takes two operations A and B that happened concurrently and
-    # # produces two operations A' and B' (in an array) such that
-    # # `apply(apply(S, A), B') = apply(apply(S, B), A')`. This function is the
-    # # heart of OT.
-    # TextOperation.transform = function (operation1, operation2) {
-    #   if (operation1.base_length !== operation2.base_length) {
-    #     throw new Error("Both operations have to have the same base length");
-    #   }
-    #
-    #   var operation1prime = new TextOperation();
-    #   var operation2prime = new TextOperation();
-    #   var ops1 = operation1.ops, ops2 = operation2.ops;
-    #   var i1 = 0, i2 = 0;
-    #   var op1 = ops1[i1 += 1], op2 = ops2[i2 += 1];
-    #   while (true) {
-    #     # At every iteration of the loop, the imaginary cursor that both
-    #     # operation1 and operation2 have that operates on the input string must
-    #     # have the same position in the input string.
-    #
-    #     if (typeof op1 === 'undefined' && typeof op2 === 'undefined') {
-    #       # end condition: both ops1 and ops2 have been processed
-    #       break;
-    #     }
-    #
-    #     # next two cases: one or both ops are insert ops
-    #     # => insert the string in the corresponding prime operation, skip it in
-    #     # the other one. If both op1 and op2 are insert ops, prefer op1.
-    #     if (insert_op?(op1)) {
-    #       operation1prime.insert(op1);
-    #       operation2prime.retain(op1.length);
-    #       op1 = ops1[i1 += 1];
-    #       continue;
-    #     }
-    #     if (insert_op?(op2)) {
-    #       operation1prime.retain(op2.length);
-    #       operation2prime.insert(op2);
-    #       op2 = ops2[i2 += 1];
-    #       continue;
-    #     }
-    #
-    #     if (typeof op1 === 'undefined') {
-    #       throw new Error("Cannot compose operations: first operation is too short.");
-    #     }
-    #     if (typeof op2 === 'undefined') {
-    #       throw new Error("Cannot compose operations: first operation is too long.");
-    #     }
-    #
-    #     var minl;
-    #     if (retain_op?(op1) && retain_op?(op2)) {
-    #       # Simple case: retain/retain
-    #       if (op1 > op2) {
-    #         minl = op2;
-    #         op1 = op1 - op2;
-    #         op2 = ops2[i2 += 1];
-    #       } else if (op1 === op2) {
-    #         minl = op2;
-    #         op1 = ops1[i1 += 1];
-    #         op2 = ops2[i2 += 1];
-    #       } else {
-    #         minl = op1;
-    #         op2 = op2 - op1;
-    #         op1 = ops1[i1 += 1];
-    #       }
-    #       operation1prime.retain(minl);
-    #       operation2prime.retain(minl);
-    #     } else if (delete_op?(op1) && delete_op?(op2)) {
-    #       # Both operations delete the same string at the same position. We don't
-    #       # need to produce any operations, we just skip over the delete ops and
-    #       # handle the case that one operation deletes more than the other.
-    #       if (-op1 > -op2) {
-    #         op1 = op1 - op2;
-    #         op2 = ops2[i2 += 1];
-    #       } else if (op1 === op2) {
-    #         op1 = ops1[i1 += 1];
-    #         op2 = ops2[i2 += 1];
-    #       } else {
-    #         op2 = op2 - op1;
-    #         op1 = ops1[i1 += 1];
-    #       }
-    #     # next two cases: delete/retain and retain/delete
-    #     } else if (delete_op?(op1) && retain_op?(op2)) {
-    #       if (-op1 > op2) {
-    #         minl = op2;
-    #         op1 = op1 + op2;
-    #         op2 = ops2[i2 += 1];
-    #       } else if (-op1 === op2) {
-    #         minl = op2;
-    #         op1 = ops1[i1 += 1];
-    #         op2 = ops2[i2 += 1];
-    #       } else {
-    #         minl = -op1;
-    #         op2 = op2 + op1;
-    #         op1 = ops1[i1 += 1];
-    #       }
-    #       operation1prime['delete'](minl);
-    #     } else if (retain_op?(op1) && delete_op?(op2)) {
-    #       if (op1 > -op2) {
-    #         minl = -op2;
-    #         op1 = op1 + op2;
-    #         op2 = ops2[i2 += 1];
-    #       } else if (op1 === -op2) {
-    #         minl = op1;
-    #         op1 = ops1[i1 += 1];
-    #         op2 = ops2[i2 += 1];
-    #       } else {
-    #         minl = op1;
-    #         op2 = op2 + op1;
-    #         op1 = ops1[i1 += 1];
-    #       }
-    #       operation2prime['delete'](minl);
-    #     } else {
-    #       throw new Error("The two operations aren't compatible");
-    #     }
-    #   }
-    #
-    #   return [operation1prime, operation2prime];
-    # };
+    # Transform takes two operations A and B that happened concurrently and
+    # produces two operations A' and B' (in an array) such that
+    # `apply(apply(S, A), B') = apply(apply(S, B), A')`. This function is the
+    # heart of OT.
+    def self.transform(operation1, operation2)
+      if (operation1.base_length != operation2.base_length)
+        fail 'Both operations have to have the same base length'
+      end
+
+      operation1prime = TextOperation.new
+      operation2prime = TextOperation.new
+
+      ops1 = operation1.ops
+      ops2 = operation2.ops
+
+      i1 = 0
+      i2 = 0
+
+      op1 = ops1[i1]
+      op2 = ops2[i2]
+
+      loop do
+        # At every iteration of the loop, the imaginary cursor that both
+        # operation1 and operation2 have that operates on the input string must
+        # have the same position in the input string.
+
+        if op1.nil? && op2.nil?
+          # end condition: both ops1 and ops2 have been processed
+          break
+        end
+
+        # next two cases: one or both ops are insert ops
+        # => insert the string in the corresponding prime operation, skip it in
+        # the other one. If both op1 and op2 are insert ops, prefer op1.
+        if insert_op?(op1)
+          operation1prime.insert(op1)
+          operation2prime.retain(op1.length)
+          op1 = ops1[i1 += 1]
+          next
+        end
+
+        if insert_op?(op2)
+          operation1prime.retain(op2.length)
+          operation2prime.insert(op2)
+          op2 = ops2[i2 += 1]
+          next
+        end
+
+        if op1.nil?
+          fail 'Cannot transform operations: first operation is too short.'
+        end
+        if op2.nil?
+          fail 'Cannot transform operations: first operation is too long.'
+        end
+
+        minl = nil
+
+        if retain_op?(op1) && retain_op?(op2)
+          # Simple case: retain/retain
+          if op1 > op2
+            minl = op2
+            op1 -= op2
+            op2 = ops2[i2 += 1]
+          elsif (op1 == op2)
+            minl = op2
+            op1 = ops1[i1 += 1]
+            op2 = ops2[i2 += 1]
+          else
+            minl = op1
+            op2 -= op1
+            op1 = ops1[i1 += 1]
+          end
+
+          operation1prime.retain(minl)
+          operation2prime.retain(minl)
+        elsif delete_op?(op1) && delete_op?(op2)
+          # Both operations delete the same string at the same position. We don't
+          # need to produce any operations, we just skip over the delete ops and
+          # handle the case that one operation deletes more than the other.
+          if -op1 > -op2
+            op1 -= op2
+            op2 = ops2[i2 += 1]
+          elsif (op1 == op2)
+            op1 = ops1[i1 += 1]
+            op2 = ops2[i2 += 1]
+          else
+            op2 -= op1
+            op1 = ops1[i1 += 1]
+          end
+        # next two cases: delete/retain and retain/delete
+        elsif delete_op?(op1) && retain_op?(op2)
+          if -op1 > op2
+            minl = op2
+            op1 += op2
+            op2 = ops2[i2 += 1]
+          elsif (-op1 == op2)
+            minl = op2
+            op1 = ops1[i1 += 1]
+            op2 = ops2[i2 += 1]
+          else
+            minl = -op1
+            op2 += op1
+            op1 = ops1[i1 += 1]
+          end
+
+          operation1prime.delete(minl)
+        elsif retain_op?(op1) && delete_op?(op2)
+          if op1 > -op2
+            minl = -op2
+            op1 += op2
+            op2 = ops2[i2 += 1]
+          elsif (op1 == -op2)
+            minl = op1
+            op1 = ops1[i1 += 1]
+            op2 = ops2[i2 += 1]
+          else
+            minl = op1
+            op2 += op1
+            op1 = ops1[i1 += 1]
+          end
+
+          operation2prime.delete(minl)
+        else
+          throw new Error("The two operations aren't compatible")
+        end
+      end
+
+      return [operation1prime, operation2prime]
+    end
   end
 end
