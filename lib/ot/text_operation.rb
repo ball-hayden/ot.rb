@@ -309,7 +309,7 @@ module OT
           end
         elsif insert_op?(op1) && delete_op?(op2)
           if op1.length > -op2
-            op1 = op1.slice(-op2)
+            op1 = op1.slice(-op2, op1.length)
             op2 = ops2[i2 += 1]
           elsif (op1.length == -op2)
             op1 = ops1[i1 += 1]
@@ -396,7 +396,7 @@ module OT
       return false unless simple_a && simple_b
 
       if insert_op?(simple_a) && insert_op?(simple_b)
-        return start_a + simple_a.length === start_b
+        return start_a + simple_a.length == start_b
       end
 
       if delete_op?(simple_a) && delete_op?(simple_b)
@@ -423,11 +423,11 @@ module OT
       return false unless simple_a && simple_b
 
       if insert_op?(simple_a) && insert_op?(simple_b)
-        return start_a + simple_a.length === start_b || start_a === start_b
+        return start_a + simple_a.length == start_b || start_a == start_b
       end
 
       if delete_op?(simple_a) && delete_op?(simple_b)
-        return start_b - simple_b === start_a
+        return start_b - simple_b == start_a
       end
 
       return false
