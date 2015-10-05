@@ -238,108 +238,123 @@ module OT
       return inverse
     end
 
-    # # Compose merges two consecutive operations into one operation, that
-    # # preserves the changes of both. Or, in other words, for each input string S
-    # # and a pair of consecutive operations A and B,
-    # # apply(apply(S, A), B) = apply(S, compose(A, B)) must hold.
-    # TextOperation.prototype.compose = function (operation2) {
-    #   var operation1 = this;
-    #   if (operation1.target_length !== operation2.base_length) {
-    #     throw new Error("The base length of the second operation has to be the target length of the first operation");
-    #   }
-    #
-    #   var operation = new TextOperation(); # the combined operation
-    #   var ops1 = operation1.ops, ops2 = operation2.ops; # for fast access
-    #   var i1 = 0, i2 = 0; # current index into ops1 respectively ops2
-    #   var op1 = ops1[i1++], op2 = ops2[i2++]; # current ops
-    #   while (true) {
-    #     # Dispatch on the type of op1 and op2
-    #     if (typeof op1 === 'undefined' && typeof op2 === 'undefined') {
-    #       # end condition: both ops1 and ops2 have been processed
-    #       break;
-    #     }
-    #
-    #     if (delete_op?(op1)) {
-    #       operation['delete'](op1);
-    #       op1 = ops1[i1++];
-    #       continue;
-    #     }
-    #     if (insert_op?(op2)) {
-    #       operation.insert(op2);
-    #       op2 = ops2[i2++];
-    #       continue;
-    #     }
-    #
-    #     if (typeof op1 === 'undefined') {
-    #       throw new Error("Cannot compose operations: first operation is too short.");
-    #     }
-    #     if (typeof op2 === 'undefined') {
-    #       throw new Error("Cannot compose operations: first operation is too long.");
-    #     }
-    #
-    #     if (retain_op?(op1) && retain_op?(op2)) {
-    #       if (op1 > op2) {
-    #         operation.retain(op2);
-    #         op1 = op1 - op2;
-    #         op2 = ops2[i2++];
-    #       } else if (op1 === op2) {
-    #         operation.retain(op1);
-    #         op1 = ops1[i1++];
-    #         op2 = ops2[i2++];
-    #       } else {
-    #         operation.retain(op1);
-    #         op2 = op2 - op1;
-    #         op1 = ops1[i1++];
-    #       }
-    #     } else if (insert_op?(op1) && delete_op?(op2)) {
-    #       if (op1.length > -op2) {
-    #         op1 = op1.slice(-op2);
-    #         op2 = ops2[i2++];
-    #       } else if (op1.length === -op2) {
-    #         op1 = ops1[i1++];
-    #         op2 = ops2[i2++];
-    #       } else {
-    #         op2 = op2 + op1.length;
-    #         op1 = ops1[i1++];
-    #       }
-    #     } else if (insert_op?(op1) && retain_op?(op2)) {
-    #       if (op1.length > op2) {
-    #         operation.insert(op1.slice(0, op2));
-    #         op1 = op1.slice(op2);
-    #         op2 = ops2[i2++];
-    #       } else if (op1.length === op2) {
-    #         operation.insert(op1);
-    #         op1 = ops1[i1++];
-    #         op2 = ops2[i2++];
-    #       } else {
-    #         operation.insert(op1);
-    #         op2 = op2 - op1.length;
-    #         op1 = ops1[i1++];
-    #       }
-    #     } else if (retain_op?(op1) && delete_op?(op2)) {
-    #       if (op1 > -op2) {
-    #         operation['delete'](op2);
-    #         op1 = op1 + op2;
-    #         op2 = ops2[i2++];
-    #       } else if (op1 === -op2) {
-    #         operation['delete'](op2);
-    #         op1 = ops1[i1++];
-    #         op2 = ops2[i2++];
-    #       } else {
-    #         operation['delete'](op1);
-    #         op2 = op2 + op1;
-    #         op1 = ops1[i1++];
-    #       }
-    #     } else {
-    #       throw new Error(
-    #         "This shouldn't happen: op1: " +
-    #         JSON.stringify(op1) + ", op2: " +
-    #         JSON.stringify(op2)
-    #       );
-    #     }
-    #   }
-    #   return operation;
-    # };
+    # Compose merges two consecutive operations into one operation, that
+    # preserves the changes of both. Or, in other words, for each input string S
+    # and a pair of consecutive operations A and B,
+    # apply(apply(S, A), B) = apply(S, compose(A, B)) must hold.
+    def compose(operation2)
+      operation1 = self
+      if operation1.target_length != operation2.base_length
+        fail 'The base length of the second operation has to be the target length of the first operation'
+      end
+
+      operation = TextOperation.new; # the combined operation
+
+      # for fast access
+      ops1 = operation1.ops
+      ops2 = operation2.ops
+
+      # current index into ops1 respectively ops2
+      i1 = 0
+      i2 = 0
+
+      # current ops
+      op1 = ops1[i1]
+      op2 = ops2[i2]
+
+      loop do
+        # Dispatch on the type of op1 and op2
+        if op1.nil? && op2.nil?
+          # end condition: both ops1 and ops2 have been processed
+          break
+        end
+
+        if delete_op?(op1)
+          operation.delete(op1)
+
+          op1 = ops1[i1 += 1]
+          next
+        end
+
+        if insert_op?(op2)
+          operation.insert(op2)
+
+          op2 = ops2[i2 += 1]
+          next
+        end
+
+        if op1.nil?
+          fail 'Cannot compose operations: first operation is too short.'
+        end
+        if op2.nil?
+          fail 'Cannot compose operations: first operation is too long.'
+        end
+
+        if retain_op?(op1) && retain_op?(op2)
+          if op1 > op2
+            operation.retain(op2)
+            op1 -= op2
+
+            op2 = ops2[i2 += 1]
+          elsif (op1 == op2)
+            operation.retain(op1)
+
+            op1 = ops1[i1 += 1]
+            op2 = ops2[i2 += 1]
+          else
+            operation.retain(op1)
+            op2 -= op1
+
+            op1 = ops1[i1 += 1]
+          end
+        elsif insert_op?(op1) && delete_op?(op2)
+          if op1.length > -op2
+            op1 = op1.slice(-op2)
+            op2 = ops2[i2 += 1]
+          elsif (op1.length == -op2)
+            op1 = ops1[i1 += 1]
+            op2 = ops2[i2 += 1]
+          else
+            op2 += op1.length
+            op1 = ops1[i1 += 1]
+          end
+        elsif insert_op?(op1) && retain_op?(op2)
+          if op1.length > op2
+            operation.insert(op1.slice(0, op2))
+            op1 = op1.slice(op2, op1.length - op2)
+            op2 = ops2[i2 += 1]
+          elsif (op1.length == op2)
+            operation.insert(op1)
+            op1 = ops1[i1 += 1]
+            op2 = ops2[i2 += 1]
+          else
+            operation.insert(op1)
+            op2 -= op1.length
+            op1 = ops1[i1 += 1]
+          end
+        elsif retain_op?(op1) && delete_op?(op2)
+          if op1 > -op2
+            operation.delete(op2)
+            op1 += op2
+            op2 = ops2[i2 += 1]
+          elsif (op1 == -op2)
+            operation.delete(op2)
+            op1 = ops1[i1 += 1]
+            op2 = ops2[i2 += 1]
+          else
+            operation.delete(op1)
+            op2 += op1
+            op1 = ops1[i1 += 1]
+          end
+        else
+          fail "This shouldn't happen: op1: " +
+            JSON.stringify(op1) + ', op2: ' +
+            JSON.stringify(op2)
+        end
+      end
+
+      return operation
+    end
 
     def self.get_simple_op(operation)
       ops = operation.ops
@@ -431,7 +446,7 @@ module OT
     #   var operation2prime = new TextOperation();
     #   var ops1 = operation1.ops, ops2 = operation2.ops;
     #   var i1 = 0, i2 = 0;
-    #   var op1 = ops1[i1++], op2 = ops2[i2++];
+    #   var op1 = ops1[i1 += 1], op2 = ops2[i2 += 1];
     #   while (true) {
     #     # At every iteration of the loop, the imaginary cursor that both
     #     # operation1 and operation2 have that operates on the input string must
@@ -448,13 +463,13 @@ module OT
     #     if (insert_op?(op1)) {
     #       operation1prime.insert(op1);
     #       operation2prime.retain(op1.length);
-    #       op1 = ops1[i1++];
+    #       op1 = ops1[i1 += 1];
     #       continue;
     #     }
     #     if (insert_op?(op2)) {
     #       operation1prime.retain(op2.length);
     #       operation2prime.insert(op2);
-    #       op2 = ops2[i2++];
+    #       op2 = ops2[i2 += 1];
     #       continue;
     #     }
     #
@@ -471,15 +486,15 @@ module OT
     #       if (op1 > op2) {
     #         minl = op2;
     #         op1 = op1 - op2;
-    #         op2 = ops2[i2++];
+    #         op2 = ops2[i2 += 1];
     #       } else if (op1 === op2) {
     #         minl = op2;
-    #         op1 = ops1[i1++];
-    #         op2 = ops2[i2++];
+    #         op1 = ops1[i1 += 1];
+    #         op2 = ops2[i2 += 1];
     #       } else {
     #         minl = op1;
     #         op2 = op2 - op1;
-    #         op1 = ops1[i1++];
+    #         op1 = ops1[i1 += 1];
     #       }
     #       operation1prime.retain(minl);
     #       operation2prime.retain(minl);
@@ -489,43 +504,43 @@ module OT
     #       # handle the case that one operation deletes more than the other.
     #       if (-op1 > -op2) {
     #         op1 = op1 - op2;
-    #         op2 = ops2[i2++];
+    #         op2 = ops2[i2 += 1];
     #       } else if (op1 === op2) {
-    #         op1 = ops1[i1++];
-    #         op2 = ops2[i2++];
+    #         op1 = ops1[i1 += 1];
+    #         op2 = ops2[i2 += 1];
     #       } else {
     #         op2 = op2 - op1;
-    #         op1 = ops1[i1++];
+    #         op1 = ops1[i1 += 1];
     #       }
     #     # next two cases: delete/retain and retain/delete
     #     } else if (delete_op?(op1) && retain_op?(op2)) {
     #       if (-op1 > op2) {
     #         minl = op2;
     #         op1 = op1 + op2;
-    #         op2 = ops2[i2++];
+    #         op2 = ops2[i2 += 1];
     #       } else if (-op1 === op2) {
     #         minl = op2;
-    #         op1 = ops1[i1++];
-    #         op2 = ops2[i2++];
+    #         op1 = ops1[i1 += 1];
+    #         op2 = ops2[i2 += 1];
     #       } else {
     #         minl = -op1;
     #         op2 = op2 + op1;
-    #         op1 = ops1[i1++];
+    #         op1 = ops1[i1 += 1];
     #       }
     #       operation1prime['delete'](minl);
     #     } else if (retain_op?(op1) && delete_op?(op2)) {
     #       if (op1 > -op2) {
     #         minl = -op2;
     #         op1 = op1 + op2;
-    #         op2 = ops2[i2++];
+    #         op2 = ops2[i2 += 1];
     #       } else if (op1 === -op2) {
     #         minl = op1;
-    #         op1 = ops1[i1++];
-    #         op2 = ops2[i2++];
+    #         op1 = ops1[i1 += 1];
+    #         op2 = ops2[i2 += 1];
     #       } else {
     #         minl = op1;
     #         op2 = op2 + op1;
-    #         op1 = ops1[i1++];
+    #         op1 = ops1[i1 += 1];
     #       }
     #       operation2prime['delete'](minl);
     #     } else {
