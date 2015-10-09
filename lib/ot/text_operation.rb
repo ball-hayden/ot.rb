@@ -155,9 +155,13 @@ module OT
     end
 
     # Converts operation into an array value.
-    # Note that this replaces the toJSON method in ot.js
     def to_a
       return @ops
+    end
+
+    # For serialization.
+    def to_json(_options = {})
+      return to_a.to_json
     end
 
     # Converts an array into an operation and validates it.
